@@ -1,0 +1,129 @@
+
+
+----------ENGAGEMENT DATA ANALYSIS----------------------
+
+
+SELECT COUNT(DISTINCT id) total_users,
+        ROUND(AVG(time_spent),2) AS avg_time_spent,
+        activity_type,
+        month_
+FROM (
+
+
+SELECT *,
+        CASE WHEN date_ LIKE 'Feb%' THEN 'Feb'
+             WHEN date_ LIKE 'Jan%' THEN 'Jan'
+             ELSE NULL END AS month_
+        
+
+FROM engagement_data
+
+)
+
+GROUP BY month_ ,
+            activity_type
+
+;
+
+
+-------------------ONBOARDING_DATA FOR GUESTS--------------------
+
+
+SELECT *,
+        DENSE_RANK() OVER (PARTITION BY  funnel_name,month_ ORDER BY total_users DESC) AS row_num
+
+FROM (
+
+SELECT COUNT(DISTINCT id) as total_users,
+        funnel_name,
+        event_name,
+        SUBSTR(REPLACE(date_,'-',''),1,6) as month_
+
+
+FROM onboarding_data1 
+
+WHERE id IS NOT NULL 
+and funnel_name = 'guest_onboarding_funnel'
+GROUP BY funnel_name,
+         event_name,
+         substr(REPLACE(date_,'-',''),1,6)
+)
+
+;
+
+
+
+
+----------------ONBOARDING DATA FOR REGISTERED USERS-------------------
+
+
+SELECT *,
+        DENSE_RANK() OVER (PARTITION BY  funnel_name,month_ ORDER BY total_users DESC) AS row_num
+
+FROM (
+
+SELECT COUNT(DISTINCT id) as total_users,
+        funnel_name,
+        event_name,
+        SUBSTR(REPLACE(date_,'-',''),1,6) as month_
+
+
+FROM onboarding_data1 
+WHERE id IS NOT NULL
+GROUP BY funnel_name,
+         event_name,
+         substr(REPLACE(date_,'-',''),1,6)
+)
+WHERE funnel_name = 'registered_onboarding_funnel'
+GROUP BY month_,total_users, funnel_name, event_name
+;
+
+
+
+-------------------ONBOARDING DATA FOR REGISTERED USERS-----------------------
+
+
+SELECT first_app_open as step_1,
+    CASE WHEN phone_entered is null then first_app_open ELSE phone_entered END AS step_2,
+       CASE WHEN otp_verified is null then phone_entered ELSE otp_verified END AS step_3,
+       CASE  WHEN user_signed_up is null then otp_verified ELSE user_signed_up END AS step_4,
+       CASE     WHEN name_screen_launch is null then user_signed_up ELSE name_screen_launch END AS step_5,
+        CASE    WHEN gender_screen_launch is null then name_screen_launch ELSE gender_screen_launch END AS step_6,
+        CASE    WHEN grade_screen_launch is null then gender_screen_launch  ELSE grade_screen_launch END AS step_7
+
+FROM (
+
+SELECT  MAX(CASE WHEN row_num = 1 then total_users ELSE NULL END) AS first_app_open,
+        MAX(CASE WHEN row_num = 2 then total_users ELSE NULL END) AS phone_entered,
+        MAX(CASE WHEN row_num = 3 THEN total_users ELSE NULL END) AS otp_verified,
+        MAX(CASE WHEN row_num = 4 THEN total_users ELSE NULL END) AS user_signed_up,
+        MAX(CASE WHEN row_num = 5 THEN total_users ELSE NULL END) AS name_screen_launch,
+        MAX(CASE WHEN row_num = 6 THEN total_users ELSE NULL END) AS gender_screen_launch,
+        MAX(CASE WHEN row_num = 7 THEN total_users ELSE NULL END) AS grade_screen_launch,
+        month_
+
+FROM (
+
+SELECT *,
+        DENSE_RANK() OVER (PARTITION BY  funnel_name,month_ ORDER BY total_users DESC) AS row_num
+
+FROM (
+
+SELECT COUNT(DISTINCT id) as total_users,
+        funnel_name,
+        event_name,
+        SUBSTR(REPLACE(date_,'-',''),1,6) as month_
+
+
+FROM onboarding_data1 
+WHERE id IS NOT NULL
+GROUP BY funnel_name,
+         event_name,
+         substr(REPLACE(date_,'-',''),1,6)
+)
+
+)
+WHERE funnel_name = 'registered_onboarding_funnel'
+GROUP BY month_
+)
+;
